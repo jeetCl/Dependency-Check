@@ -1,0 +1,41 @@
+name: Dependency-Check SCA
+
+on:
+  workflow_dispatch: # Manual trigger
+  pull_request:
+    branches: ["main"]
+  push:
+    branches: ["main"]
+
+jobs:
+  dependency-check:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Java (required for dependency-check)
+        uses: actions/setup-java@v3
+        with:
+          distribution: temurin
+          java-version: 17
+
+      - name: Install Dependency-Check
+        run: |
+          wget https://github.com/jeremylong/DependencyCheck/releases/download/v8.0.2/dependency-check-8.0.2-release.zip
+          unzip dependency-check-8.0.2-release.zip -d $HOME/dependency-check
+
+      - name: Run Dependency-Check
+        run: |
+          $HOME/dependency-check/dependency-check/bin/dependency-check.sh \
+          --project "ReactApp" \
+          --scan ./ \
+          --format "ALL" \
+          --out ./dependency-check-report
+
+      - name: Upload Report
+        uses: actions/upload-artifact@v4
+        with:
+          name: dependency-check-report
+          path: ./dependency-check-report
+
