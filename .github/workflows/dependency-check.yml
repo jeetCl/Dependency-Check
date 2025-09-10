@@ -14,33 +14,32 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      # Checkout your code
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      # Set up Java (required for Dependency-Check)
       - name: Set up JDK 17
         uses: actions/setup-java@v3
         with:
           distribution: temurin
           java-version: 17
 
-      # Download and run Dependency-Check
-      - name: Run Dependency-Check
+      - name: Download and Run Dependency-Check
         env:
           NVD_API_KEY: ${{ secrets.NVD_API_KEY }}
         run: |
-          curl -L -o dependency-check.zip https://github.com/DependencyCheck/dependency-check/releases/latest/download/dependency-check-8.3.2-release.zip
+          # Download the latest release (Linux ZIP)
+          curl -L -o dependency-check.zip https://github.com/DependencyCheck/dependency-check/releases/download/v8.3.2/dependency-check-8.3.2-release.zip
+          
           unzip dependency-check.zip -d dependency-check
           chmod +x dependency-check/dependency-check/bin/dependency-check.sh
+          
           ./dependency-check/dependency-check/bin/dependency-check.sh \
             --project "MyProject" \
             --scan . \
-            --format "HTML" \
+            --format "ALL" \
             --out dependency-check-report \
             --enableExperimental
 
-      # Upload the report as an artifact
       - name: Upload Dependency-Check Report
         uses: actions/upload-artifact@v4
         with:
