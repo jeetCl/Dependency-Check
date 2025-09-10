@@ -4,35 +4,41 @@ on:
   push:
     branches:
       - main
-      - 'feature/**'
   pull_request:
 
 jobs:
   dependency-check:
     runs-on: ubuntu-latest
-
     steps:
       - name: Checkout repository
         uses: actions/checkout@v3
 
-      - name: Set NVD API Key
-        run: echo "NVD_API_KEY=${{ secrets.NVD_API_KEY }}" >> $GITHUB_ENV
+      - name: Set up Java (Dependency-Check requires Java)
+        uses: actions/setup-java@v3
+        with:
+          distribution: 'temurin'
+          java-version: '17'
 
-      - name: Install Dependency-Check
+      - name: Download OWASP Dependency-Check
         run: |
           wget https://github.com/jeremylong/DependencyCheck/releases/download/v8.0.2/dependency-check-8.0.2-release.zip -O dependency-check.zip
-          unzip -o dependency-check.zip -d $HOME
-          chmod +x $HOME/dependency-check/dependency-check.sh
+          unzip dependency-check.zip -d dependency-check
+          chmod +x dependency-check/dependency-check/bin/dependency-check.sh
 
-      - name: Run Dependency-Check
+      - name: Run Dependency-Check Scan
+        env:
+          NVD_API_KEY: ${{ secrets.NVD_API_KEY }}
         run: |
-          $HOME/dependency-check/dependency-check.sh \
-            -s ./src \
-            -o ./dependency-check-report \
-            -f HTML,JSON
+          ./dependency-check/dependency-check/bin/dependency-check.sh \
+          --project "MyProject" \
+          --scan . \
+          --format "HTML" \
+          --out dependency-check-report \
+          --enableExperimental \
+          --nvdApiKey $NVD_API_KEY
 
       - name: Upload Dependency-Check Report
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v3
         with:
           name: dependency-check-report
-          path: ./dependency-check-report
+          path: dependency-check-report/
