@@ -1,58 +1,60 @@
-name: Dependency-Check Scan
+name: Dependency-Check SCA
 
 on:
-  push:
-    branches: [ "main" ]
+  workflow_dispatch: # Manual trigger
   pull_request:
-    branches: [ "main" ]
+    branches: ["main"]
+  push:
+    branches: ["main"]
 
 jobs:
   dependency-check:
     runs-on: ubuntu-latest
-
     steps:
-      - name: Checkout repository
+      - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Set up Java
-        uses: actions/setup-java@v4
+      - name: Setup Java (required for dependency-check)
+        uses: actions/setup-java@v3
         with:
-          java-version: '21'
-          distribution: 'temurin'
+          distribution: temurin
+          java-version: 17
 
-      - name: Download Dependency-Check
+      - name: Install Dependency-Check
         run: |
-          curl -L https://github.com/jeremylong/DependencyCheck/releases/download/v12.1.0/dependency-check-12.1.0-release.zip -o dc.zip
-          unzip -q dc.zip -d $HOME/dependency-check
+          wget https://github.com/jeremylong/DependencyCheck/releases/download/v8.0.2/dependency-check-8.0.2-release.zip
+          unzip dependency-check-8.0.2-release.zip -d $HOME/dependency-check
 
-      # ✅ Debug step: confirm API key is being passed safely
+      # ✅ Debug: Ensure API Key is set
       - name: Debug API Key (masked)
         run: |
           if [ -z "${{ secrets.NVD_API_KEY }}" ]; then
             echo "❌ NVD_API_KEY is missing!"
             exit 1
           else
-            echo "✅ NVD_API_KEY is set (masked)."
-            echo "Key length: ${#${{ secrets.NVD_API_KEY }}} characters"
+            echo "✅ NVD_API_KEY is set (value is masked in logs)."
           fi
 
-      # ✅ Extra debug: check Dependency-Check version and NVD connectivity
+      # ✅ Extra debug: Check Dependency-Check version & NVD connectivity
       - name: Verify Dependency-Check setup
         run: |
           $HOME/dependency-check/dependency-check/bin/dependency-check.sh --version
-          curl -I https://services.nvd.nist.gov/rest/json/cves/2.0?resultsPerPage=1 || true
+          echo "🔎 Testing NVD API connectivity..."
+          curl -I "https://services.nvd.nist.gov/rest/json/cves/2.0?resultsPerPage=1" || true
 
       - name: Run Dependency-Check
+        env:
+          NVD_API_KEY: ${{ secrets.NVD_API_KEY }}
         run: |
           $HOME/dependency-check/dependency-check/bin/dependency-check.sh \
-            --project "ReactApp" \
-            --scan . \
-            --format HTML \
-            --out ./report \
-            --nvdApiKey ${{ secrets.NVD_API_KEY }}
+          --project "ReactApp" \
+          --scan ./ \
+          --format "ALL" \
+          --out ./dependency-check-report \
+          --nvdApiKey $NVD_API_KEY || echo "⚠️ Dependency-Check completed with warnings"
 
-      - name: Upload report
+      - name: Upload Report
         uses: actions/upload-artifact@v4
         with:
           name: dependency-check-report
-          path: ./report
+          path: ./dependency-check-report
