@@ -1,59 +1,31 @@
-name: Dependency-Check SCA
+name: Dependency-Check Scan
 
 on:
-  workflow_dispatch: # Manual trigger
-  pull_request:
-    branches: ["main"]
   push:
-    branches: ["main"]
+    branches:
+      - main
+      - 'feature/**'
+  pull_request:
 
 jobs:
   dependency-check:
     runs-on: ubuntu-latest
+
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
+      - name: Checkout repository
+        uses: actions/checkout@v3
 
-      - name: Setup Java (required for dependency-check)
-        uses: actions/setup-java@v3
-        with:
-          distribution: temurin
-          java-version: 17
-
-      - name: Install Dependency-Check
-        run: |
-          wget https://github.com/jeremylong/DependencyCheck/releases/download/v8.0.2/dependency-check-8.0.2-release.zip
-          unzip dependency-check-8.0.2-release.zip -d $HOME/dependency-check
-
-      # ✅ Debug: Ensure API Key is set
-      - name: Debug API Key (masked)
-        run: |
-          if [ -z "${{ secrets.NVD_API_KEY }}" ]; then
-            echo "❌ NVD_API_KEY is missing!"
-            exit 1
-          else
-            echo "✅ NVD_API_KEY is set (value is masked in logs)."
-          fi
-
-      # ✅ Extra debug: Check Dependency-Check version & NVD connectivity
-      - name: Verify Dependency-Check setup
-        run: |
-          $HOME/dependency-check/dependency-check/bin/dependency-check.sh --version
-          echo "🔎 Testing NVD API connectivity..."
-          curl -I "https://services.nvd.nist.gov/rest/json/cves/2.0?resultsPerPage=1" || true
+      - name: Set NVD API Key
+        run: echo "NVD_API_KEY=${{ secrets.NVD_API_KEY }}" >> $GITHUB_ENV
 
       - name: Run Dependency-Check
-        env:
-          NVD_API_KEY: ${{ secrets.NVD_API_KEY }}
         run: |
           $HOME/dependency-check/dependency-check/bin/dependency-check.sh \
-          --project "ReactApp" \
-          --scan ./ \
-          --format "ALL" \
-          --out ./dependency-check-report \
-          --nvdApiKey $NVD_API_KEY || echo "⚠️ Dependency-Check completed with warnings"
+            -s ./src \
+            -o ./dependency-check-report \
+            -f HTML,JSON
 
-      - name: Upload Report
+      - name: Upload Dependency-Check Report
         uses: actions/upload-artifact@v4
         with:
           name: dependency-check-report
